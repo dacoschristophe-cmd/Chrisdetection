@@ -1,0 +1,22 @@
+{
+  "name": "ID Detect — Assistant d’identification",
+  "short_name": "ID Detect",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0f1116",
+  "theme_color": "#0f1116",
+  "icons": [
+    {
+      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAQAAAB4n0m7AAAACXBIWXMAAAsSAAALEgHS3X78AAABjUlEQVR4nO3SMQ7CMBRF0aY9jvV9k2QmJ8QwJ0wO7F7U4m6Wg2r8y8r4o3nU7o9l8uQ3i+QbKZkQAAAAAAAAAAAD8m4c6gM1r3p9m9X2rWm8oE0Rr2j6i7CzQJbXx3cBq3mVw8kzj8t7y5jS4fQ9yM0q8qS3mCzv5d0f2QbYFjz2t5c7z7M+JzH3Q3w6N1Bq2m8m8n3l0Xc2d1H9d7glw9p2P4f4pQJQv1y6a8k7c5w5f1b0b8J8bS0+v6y0wqg1kz2h9mX7b3Qd0n5bNQm8lrr6G0nQ5b3QnQ3dXf0YQm8p7YfEJf3K4wVYw6o0AAAAAAAAAAKxw0gH0mA8J7K0I3nYt6fQnqf7V5mK1o9e2c8Kqg3Q0wqk9mJ5jQ3l8XlQ2c8Wgqg7l9w3W0+Q8u9w7o0Kk6qkVY9g8J2H0gH8c6k3cA5I2wQAAAAAElFTkSuQmCC",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAQAAAB9t0bVAAAACXBIWXMAAAsSAAALEgHS3X78AAAB/UlEQVR4nO3SQQrCMBBF0T7K/3/V7y0A9o0aQq2uYQ0XkY1Gd1Q1z5J8vH6m7k4k1k7t6wAAAAAAAAAAgM2w0w7w3a2v1l3b1o1t2rX3b7kA5kH5Nf5m9H6y3kq1qS3W9G1p2wA5l9z9eR7u7qG7XvYz3gP2h8f0mY7z3c83p1m5f2b8v5u5l8G6C7k9m7b0y2b5X6Q5zv+9q1h2bY3mV7i+O6nYw0m8fV8r6dTq1s5Xxv0g3xZtX9v3Q3i8j6n0Yv9gqv3gH3YHf1iZ2m9K6k7m3Y3k6r7Z9fN6b8h5m+E3+o2P2V2K8a+1Yw0AAAAAAAAAAAAA8H0eQKQq0gYk5wHqjQAAAAASUVORK5CYII=",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
