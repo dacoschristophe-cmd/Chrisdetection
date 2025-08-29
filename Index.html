@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ID Detect — Assistant d’identification (PWA)</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0f1116">
+<style>
+  :root{
+    --bg:#0f1116; --panel:#171a22; --muted:#9aa3b2; --txt:#e7ecf3; --accent:#35d07f; --accent-2:#7aa2ff; --danger:#ff6b6b;
+    --radius:14px; --radius-sm:10px; --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; color:var(--txt); background:linear-gradient(180deg,#0e1015,#0d1118 40%,#0b1016)}
+  header{position:sticky; top:0; z-index:6; backdrop-filter:saturate(1.1) blur(8px); background:rgba(11,16,22,.7); border-bottom:1px solid rgba(255,255,255,.06)}
+  .wrap{max-width:1200px; margin:0 auto; padding:16px}
+  .brand{display:flex; gap:12px; align-items:center}
+  .brand .logo{width:34px; height:34px; border-radius:9px; background:
+    radial-gradient(120% 140% at 20% 30%, #2cf0a2 0%, #0bb97d 40%, transparent 41%),
+    radial-gradient(100% 100% at 80% 20%, #80a7ff 0%, #3556ff 40%, transparent 41%),
+    linear-gradient(135deg, #12202a, #0d1116);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), var(--shadow);}
+  .brand h1{font-size:18px; margin:0}
+  .grid{display:grid; grid-template-columns: 1.1fr .9fr; gap:16px; padding:16px}
+  @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+  .panel{background:var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:var(--radius); box-shadow:var(--shadow)}
+  .panel h2{font-size:16px; margin:0 0 8px}
+  .panel .inner{padding:16px}
+  .upload{border:1.5px dashed rgba(255,255,255,.16); border-radius:var(--radius); padding:18px; text-align:center; display:flex; align-items:center; justify-content:center; min-height:120px; color:var(--muted)}
+  .upload.drag{border-color:var(--accent); color:#bdf6dc; background:rgba(53,208,127,.06)}
+  .upload input{display:none}
+  .toolbar,.annoBar{display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 0}
+  .group{display:flex; gap:8px; align-items:center; background:#10141c; border:1px solid rgba(255,255,255,.06); padding:8px; border-radius:12px}
+  label.small{font-size:12px; color:var(--muted)}
+  input[type="range"]{accent-color:var(--accent)}
+  .viewer{position:relative; background:#0c0f15; border:1px solid rgba(255,255,255,.06); border-radius:var(--radius); overflow:hidden; height:540px}
+  .canvas-scroll{width:100%; height:100%; overflow:auto; position:relative; background:repeating-conic-gradient(rgba(255,255,255,.02) 0 25%, transparent 0 50%) 0/18px 18px}
+  .imgLayer,.edgesLayer,.annoLayer,.gridLayer{position:absolute; top:0; left:0; user-select:none}
+  .edgesLayer{mix-blend-mode:screen; opacity:.85; display:none}
+  .gridLayer{pointer-events:none; opacity:.45; display:none}
+  .annoLayer{pointer-events:auto}
+  .badge{display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; color:#01210f; background:rgba(53,208,127,.9); font-weight:700}
+  .muted{color:var(--muted)}
+  .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+  .cols{display:grid; gap:10px; grid-template-columns:1fr 1fr}
+  @media (max-width:680px){ .cols{grid-template-columns:1fr} }
+  .pill{appearance:none; background:#10141c; color:var(--txt); padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.08)}
+  .pill:focus{outline:2px solid rgba(122,162,255,.6)}
+  .btn{cursor:pointer; border:none; padding:10px 14px; border-radius:12px; background:var(--accent); color:#042215; font-weight:700}
+  .btn.secondary{background:#111826; color:#cfe2ff; border:1px solid rgba(122,162,255,.4)}
+  .btn.ghost{background:transparent; border:1px solid rgba(255,255,255,.16); color:var(--txt)}
+  .btn.danger{background:var(--danger); color:#230b0b}
+  .hint{background:#0f1520; border:1px solid rgba(122,162,255,.25); border-radius:12px; padding:12px; color:#dbe5ff}
+  .list{display:grid; gap:10px}
+  .list .card{background:#0e141e; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:12px}
+  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#151b26; border:1px solid rgba(255,255,255,.1); padding:2px 6px; border-radius:6px; color:#a6b3c7}
+  footer{padding:18px; text-align:center; color:var(--muted); font-size:12px}
+  .colorDot{width:18px; height:18px; border-radius:50%; border:1px solid rgba(255,255,255,.35); display:inline-block; vertical-align:middle; margin-left:6px}
+  .helptext{font-size:12px; color:var(--muted); margin-top:6px}
+  .ocrBox{background:#0e141e; border:1px dashed rgba(255,255,255,.2); padding:8px; border-radius:10px; max-height:120px; overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap brand">
+    <div class="logo" aria-hidden="true"></div>
+    <h1>ID Detect — Assistant d’identification</h1>
+    <div style="margin-left:auto"><span class="badge">PWA • Offline après 1er chargement</span></div>
+  </div>
+</header>
+
+<div class="wrap grid">
+  <!-- Colonne gauche -->
+  <section class="panel">
+    <div class="inner">
+      <h2>1) Image, filtres, annotation & mesures</h2>
+      <div id="drop" class="upload">
+        <div>
+          <div style="font-weight:700; margin-bottom:6px">Glisse une photo ici ou <label for="file" class="kbd">choisis un fichier</label></div>
+          <div class="muted">JPEG/PNG/WEBP — net, objet cadré, bonne lumière</div>
+          <input id="file" type="file" accept="image/*">
+        </div>
+      </div>
+
+      <div class="viewer" style="margin-top:12px">
+        <div id="scroll" class="canvas-scroll">
+          <img id="img" class="imgLayer" alt="aperçu" />
+          <canvas id="edges" class="edgesLayer" aria-hidden="true"></canvas>
+          <canvas id="grid"  class="gridLayer"  aria-hidden="true"></canvas>
+          <canvas id="anno"  class="annoLayer"  aria-label="Calque d’annotation"></canvas>
+        </div>
+      </div>
+
+      <!-- Filtres & export -->
+      <div class="toolbar">
+        <div class="group">
+          <label class="small">Zoom</label>
+          <input id="zoom" type="range" min="0.5" max="4" step="0.1" value="1">
+        </div>
+        <div class="group">
+          <label class="small">Lum.</label><input id="br" type="range" min="0.5" max="2" step="0.05" value="1">
+          <label class="small">Contr.</label><input id="ct" type="range" min="0.5" max="2" step="0.05" value="1">
+          <label class="small">Sat.</label><input id="st" type="range" min="0" max="2" step="0.05" value="1">
+        </div>
+        <div class="group">
+          <button id="bw" class="btn ghost">N&B</button>
+          <button id="inv" class="btn ghost">Inverser</button>
+          <button id="edgeBtn" class="btn secondary" title="Contours (Sobel)">Contours</button>
+        </div>
+        <div class="group">
+          <button id="pick" class="btn" title="Prélever couleur puis cliquer sur l’image">Prélever couleur</button>
+          <span id="picked" class="small">—</span>
+        </div>
+        <div class="group">
+          <button id="exportImg" class="btn secondary">Télécharger image optimisée</button>
+          <button id="exportAnno" class="btn secondary">Télécharger image annotée</button>
+        </div>
+      </div>
+
+      <!-- Annotation & Mesures -->
+      <div class="annoBar">
+        <div class="group">
+          <label class="small">Annotation</label>
+          <button data-tool="arrow" class="btn ghost tool">Flèche</button>
+          <button data-tool="rect"  class="btn ghost tool">Rectangle</button>
+          <button data-tool="text"  class="btn ghost tool">Texte</button>
+          <button id="undo" class="btn ghost">Annuler</button>
+          <button id="clearAnno" class="btn danger">Effacer</button>
+        </div>
+        <div class="group">
+          <label class="small">Couleur</label><input id="acolor" type="color" value="#35d07f" class="pill" />
+          <label class="small">Épaisseur</label><input id="awidth" type="range" min="1" max="12" step="1" value="3">
+        </div>
+        <div class="group">
+          <button id="calib" class="btn">Calibrer (mm)</button>
+          <button id="measure" class="btn ghost">Mesurer</button>
+          <button id="gridToggle" class="btn secondary">Grille</button>
+          <span id="scaleInfo" class="small muted">—</span>
+        </div>
+        <div class="group">
+          <button id="ocrZone" class="btn">OCR (zone)</button>
+          <span id="ocrStatus" class="small muted">—</span>
+        </div>
+      </div>
+
+      <div class="helptext">
+        Astuces : <span class="kbd">double-clic</span> pour recentrer • en OCR, dessine un rectangle autour de la légende • en calibration, clique deux points d’une distance connue (diamètre en mm), saisis la valeur.
+      </div>
+    </div>
+  </section>
+
+  <!-- Colonne droite -->
+  <section class="panel">
+    <div class="inner">
+      <h2>2) Indices & pistes</h2>
+
+      <div class="cols">
+        <div>
+          <label class="small">Type pressenti</label>
+          <select id="type" class="pill">
+            <option value="">— Je ne sais pas encore —</option>
+            <option>Monnaie</option><option>Bouton</option><option>Fibule</option>
+            <option>Boucle</option><option>Plomb de scellé</option><option>Balle de mousquet</option>
+            <option>Bagues / Anneau</option><option>Poids / Jeton</option><option>Autre</option>
+          </select>
+        </div>
+        <div>
+          <label class="small">Métal supposé</label>
+          <select id="metal" class="pill">
+            <option value="">— Indéfini —</option>
+            <option>Cuivre / Bronze</option><option>Laiton</option><option>Argent</option>
+            <option>Or</option><option>Plomb</option><option>Fer / Acier</option>
+          </select>
+        </div>
+        <div>
+          <label class="small">Diamètre (mm) ou dimension max</label>
+          <input id="diam" type="number" min="1" max="80" step="0.1" class="pill" placeholder="ex. 22.0">
+        </div>
+        <div>
+          <label class="small">Lettres/motifs visibles</label>
+          <input id="letters" type="text" class="pill" placeholder="ex: LVDOVICVS, 1853, croix, lion…">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <label><input type="checkbox" class="pill" id="rond"> Rond / disque</label>
+        <label><input type="checkbox" class="pill" id="trou"> Trou central</label>
+        <label><input type="checkbox" class="pill" id="attache"> Attache / pied</label>
+        <label><input type="checkbox" class="pill" id="charniere"> Charnière</label>
+        <label><input type="checkbox" class="pill" id="ardillon"> Ardillon / ressort</label>
+        <label><input type="checkbox" class="pill" id="canal"> Canal / fente latérale</label>
+        <label><input type="checkbox" class="pill" id="boucle"> Cadre (forme de boucle)</label>
+        <label><input type="checkbox" class="pill" id="portrait"> Portrait</label>
+        <label><input type="checkbox" class="pill" id="croix"> Croix</label>
+        <label><input type="checkbox" class="pill" id="animal"> Animal / zoomorphe</label>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <input id="context" class="pill" style="flex:1" placeholder="Contexte (champ, forêt, plage, militaire, ferme…)">
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="gen" class="btn">Générer des pistes</button>
+        <button id="reset" class="btn ghost">Réinitialiser</button>
+        <button id="exportMd" class="btn secondary">Exporter rapport (MD)</button>
+        <button id="exportJSON" class="btn secondary">Fiche (JSON)</button>
+        <button id="exportCSV" class="btn secondary">Fiche (CSV)</button>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="small">OCR brut (ajustable avant de l’envoyer dans « Lettres »)</label>
+        <div id="ocrOut" class="ocrBox muted">—</div>
+        <div class="row" style="margin-top:6px">
+          <button id="pushOCR" class="btn ghost">Ajouter à « Lettres »</button>
+          <button id="clearOCR" class="btn ghost">Effacer OCR</button>
+        </div>
+      </div>
+
+      <div style="margin-top:14px" class="hint">
+        <strong>Conseil rapide :</strong> plat + pied ➜ bouton ; canal ➜ plomb de scellé ; charnière/ressort ➜ fibule ; cadre + ardillon ➜ boucle ; relief 2 faces + légende en couronne ➜ monnaie/jeton.
+      </div>
+
+      <div id="pistes" class="list" style="margin-top:12px"></div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  ID Detect — aucune donnée envoyée en ligne (hors chargement de la librairie OCR au premier usage). Respecte la loi & la sécurité (UXO/explosifs : ne pas manipuler).
+</footer>
+
+<!-- OCR: Tesseract (sera mis en cache par le SW pour offline après 1er chargement) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<script>
+/* ---------- ÉTAT & RÉF ---------- */
+const els = {
+  drop:byId('drop'), file:byId('file'),
+  img:byId('img'), edges:byId('edges'), grid:byId('grid'), anno:byId('anno'),
+  scroll:byId('scroll'),
+  zoom:byId('zoom'), br:byId('br'), ct:byId('ct'), st:byId('st'),
+  bw:byId('bw'), inv:byId('inv'), edgeBtn:byId('edgeBtn'),
+  pick:byId('pick'), picked:byId('picked'),
+  exportImg:byId('exportImg'), exportAnno:byId('exportAnno'),
+  // anno
+  tools:[...document.querySelectorAll('.tool')], undo:byId('undo'), clearAnno:byId('clearAnno'),
+  acolor:byId('acolor'), awidth:byId('awidth'),
+  calib:byId('calib'), measure:byId('measure'), gridToggle:byId('gridToggle'), scaleInfo:byId('scaleInfo'),
+  ocrZone:byId('ocrZone'), ocrStatus:byId('ocrStatus'),
+  ocrOut:byId('ocrOut'), pushOCR:byId('pushOCR'), clearOCR:byId('clearOCR'),
+  // pistes/fiche
+  gen:byId('gen'), reset:byId('reset'), exportMd:byId('exportMd'), exportJSON:byId('exportJSON'), exportCSV:byId('exportCSV'),
+  type:byId('type'), metal:byId('metal'), diam:byId('diam'), letters:byId('letters'),
+  rond:byId('rond'), trou:byId('trou'), attache:byId('attache'), charniere:byId('charniere'), ardillon:byId('ardillon'),
+  canal:byId('canal'), boucle:byId('boucle'), portrait:byId('portrait'), croix:byId('croix'), animal:byId('animal'),
+  context:byId('context'), pistes:byId('pistes')
+};
+
+let natural = {w:0,h:0};
+let picking=false;
+let activeTool=null;
+let drawing=false, startPt=null;
+let annoCtx = null;
+let annoOps = []; // pile pour undo (repeindre)
+let pxPerMm=null; // échelle
+let measuring=false, measStart=null;
+let ocrSelecting=false, ocrStart=null, ocrRect=null;
+
+/* ---------- INIT PWA ---------- */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(console.warn);
+}
+
+/* ---------- HELPERS ---------- */
+function byId(id){return document.getElementById(id)}
+function toggleBtn(btn){ const on = btn.dataset.on === '1'; btn.dataset.on = on ? '0':'1'; btn.style.outline = on ? 'none':'2px solid rgba(122,162,255,.6)'; }
+function downloadURL(url, name){const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();}
+
+/* ---------- UPLOAD ---------- */
+['dragenter','dragover'].forEach(ev=> els.drop.addEventListener(ev, e => { e.preventDefault(); els.drop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev=> els.drop.addEventListener(ev, e => { e.preventDefault(); els.drop.classList.remove('drag'); }));
+els.drop.addEventListener('drop', e => { const f=e.dataTransfer.files?.[0]; if(f) loadFile(f); });
+els.file.addEventListener('change', e => { const f=e.target.files?.[0]; if(f) loadFile(f); });
+
+function loadFile(file){
+  const ok = /image\/(jpeg|png|webp|gif)/i.test(file.type);
+  if(!ok){ alert("Format non supporté. Utilise JPEG/PNG/WEBP."); return; }
+  const url = URL.createObjectURL(file);
+  els.img.onload = () => {
+    natural.w = els.img.naturalWidth; natural.h = els.img.naturalHeight;
+    // dimensionner les calques
+    [els.edges, els.grid, els.anno].forEach(c=>{ c.width=natural.w; c.height=natural.h; c.style.width = natural.w+'px'; c.style.height = natural.h+'px'; c.style.top='0px'; c.style.left='0px'; });
+    sizeToZoom(parseFloat(els.zoom.value));
+    applyFilters();
+    buildEdges();
+    clearAnnoCanvas(true);
+    drawGrid(); // vide au début
+    centerScroll();
+  };
+  els.img.src=url;
+}
+
+/* ---------- ZOOM & PAN ---------- */
+function sizeToZoom(z){
+  if(!natural.w) return;
+  const w=Math.max(1, Math.round(natural.w*z)), h=Math.max(1, Math.round(natural.h*z));
+  els.img.style.width=w+'px'; els.img.style.height=h+'px';
+  [els.edges, els.grid, els.anno].forEach(c=>{ c.style.width=w+'px'; c.style.height=h+'px'; });
+}
+els.zoom.addEventListener('input', e=> sizeToZoom(parseFloat(e.target.value)));
+function centerScroll(){
+  const sc=els.scroll;
+  sc.scrollLeft = Math.max(0,(sc.scrollWidth-sc.clientWidth)/2);
+  sc.scrollTop  = Math.max(0,(sc.scrollHeight-sc.clientHeight)/2);
+}
+els.scroll.addEventListener('dblclick', centerScroll);
+
+/* ---------- FILTRES ---------- */
+function applyFilters(){
+  const parts=[];
+  parts.push(`brightness(${els.br.value})`);
+  parts.push(`contrast(${els.ct.value})`);
+  parts.push(`saturate(${els.st.value})`);
+  if(els.bw.dataset.on==='1') parts.push('grayscale(1)');
+  if(els.inv.dataset.on==='1') parts.push('invert(1)');
+  els.img.style.filter = parts.join(' ');
+}
+['br','ct','st'].forEach(k=> els[k].addEventListener('input', applyFilters));
+els.bw.addEventListener('click', ()=>{ toggleBtn(els.bw); applyFilters(); });
+els.inv.addEventListener('click', ()=>{ toggleBtn(els.inv); applyFilters(); });
+
+/* ---------- CONTOURS ---------- */
+function buildEdges(){
+  if(!els.img.src) return;
+  const w=natural.w, h=natural.h;
+  els.edges.width=w; els.edges.height=h;
+  const tmp=document.createElement('canvas'); tmp.width=w; tmp.height=h;
+  const tctx=tmp.getContext('2d'); tctx.drawImage(els.img,0,0);
+  const src=tctx.getImageData(0,0,w,h);
+  const out=tctx.createImageData(w,h);
+  // gris
+  const gray=new Uint8ClampedArray(w*h);
+  for(let i=0,j=0;i<src.data.length;i+=4,j++){
+    const r=src.data[i], g=src.data[i+1], b=src.data[i+2];
+    gray[j]=(0.299*r+0.587*g+0.114*b)|0;
+  }
+  const gxK=[-1,0,1,-2,0,2,-1,0,1];
+  const gyK=[-1,-2,-1,0,0,0,1,2,1];
+  for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+      let gx=0,gy=0,k=0;
+      for(let yy=-1;yy<=1;yy++){
+        for(let xx=-1;xx<=1;xx++){
+          const v=gray[(y+yy)*w+(x+xx)];
+          gx+=v*gxK[k]; gy+=v*gyK[k]; k++;
+        }
+      }
+      const mag=Math.min(255, Math.hypot(gx,gy)|0);
+      const idx=(y*w+x)*4;
+      out.data[idx]=out.data[idx+1]=out.data[idx+2]=mag; out.data[idx+3]=255;
+    }
+  }
+  els.edges.getContext('2d').putImageData(out,0,0);
+}
+els.edgeBtn.addEventListener('click', ()=>{
+  const vis=els.edges.style.display!=='none';
+  els.edges.style.display = vis?'none':'block';
+  toggleBtn(els.edgeBtn);
+});
+
+/* ---------- PICK COLOR ---------- */
+els.pick.addEventListener('click', ()=>{
+  if(!els.img.src){ alert('Charge d’abord une image.'); return; }
+  picking=true; els.pick.disabled=true; els.pick.textContent='Clique sur l’image…';
+  els.img.style.cursor='crosshair'; els.edges.style.pointerEvents='none'; els.anno.style.pointerEvents='none';
+});
+els.scroll.addEventListener('click', (e)=>{
+  if(!picking) return;
+  const rect=els.img.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rect.left)*(natural.w/rect.width));
+  const y=Math.floor((e.clientY-rect.top )*(natural.h/rect.height));
+  const c=samplePixel(els.img,x,y);
+  if(c){
+    const hex=rgbToHex(c[0],c[1],c[2]);
+    els.picked.innerHTML=`RGB(${c[0]},${c[1]},${c[2]}) <span class="colorDot" style="background:${hex}"></span> ${hex}`;
+    const guess=guessMetalFromRGB(c); if(guess){ els.metal.value=guess; }
+  }
+  picking=false; els.pick.disabled=false; els.pick.textContent='Prélever couleur'; els.img.style.cursor='default';
+  els.edges.style.pointerEvents='auto'; els.anno.style.pointerEvents='auto';
+});
+function samplePixel(img,x,y){
+  const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+  const ctx=c.getContext('2d'); ctx.drawImage(img,0,0);
+  const d=ctx.getImageData(Math.max(0,x),Math.max(0,y),1,1).data; return [d[0],d[1],d[2],d[3]];
+}
+function rgbToHex(r,g,b){const h=n=>('0'+n.toString(16)).slice(-2); return '#'+h(r)+h(g)+h(b)}
+function guessMetalFromRGB([r,g,b]){
+  if(g>r*1.1 && g>b*1.1) return 'Cuivre / Bronze';
+  if(r>200 && g>170 && b<80) return 'Laiton';
+  if(r>200 && g>200 && b>200) return 'Argent';
+  if(r>200 && g>200 && b<60) return 'Or';
+  if(r<60 && g<60 && b<60) return 'Fer / Acier';
+  if(r>150 && g>150 && b>150 && Math.abs(r-g)<20 && Math.abs(g-b)<20) return 'Plomb';
+  return '';
+}
+
+/* ---------- EXPORTS IMAGE ---------- */
+els.exportImg.addEventListener('click', ()=>{
+  if(!els.img.src) return alert('Charge d’abord une image.');
+  const w=natural.w,h=natural.h;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx=c.getContext('2d');
+  ctx.filter=getComputedStyle(els.img).filter; ctx.drawImage(els.img,0,0,w,h);
+  if(els.edges.style.display==='block'){ ctx.globalCompositeOperation='screen'; ctx.drawImage(els.edges,0,0); ctx.globalCompositeOperation='source-over'; }
+  const url=c.toDataURL('image/png'); downloadURL(url,'ID-Detect-image-optimisee.png');
+});
+els.exportAnno.addEventListener('click', ()=>{
+  if(!els.img.src) return alert('Charge d’abord une image.');
+  const w=natural.w,h=natural.h;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx=c.getContext('2d');
+  ctx.filter=getComputedStyle(els.img).filter; ctx.drawImage(els.img,0,0,w,h);
+  if(els.edges.style.display==='block'){ ctx.globalCompositeOperation='screen'; ctx.drawImage(els.edges,0,0); ctx.globalCompositeOperation='source-over'; }
+  ctx.drawImage(els.anno,0,0); // annotations par-dessus
+  const url=c.toDataURL('image/png'); downloadURL(url,'ID-Detect-image-annotée.png');
+});
+
+/* ---------- ANNOTATION ---------- */
+annoCtx = els.anno.getContext('2d');
+function clearAnnoCanvas(full=false){
+  annoCtx.clearRect(0,0,els.anno.width,els.anno.height);
+  if(full){ annoOps=[]; }
+}
+function repaintAnno(){
+  annoCtx.clearRect(0,0,els.anno.width,els.anno.height);
+  for(const op of annoOps){ drawOp(op, annoCtx, false); }
+}
+function drawOp(op, ctx, push=true){
+  ctx.save();
+  ctx.lineWidth=op.w; ctx.strokeStyle=op.color; ctx.fillStyle=op.color; ctx.lineJoin='round'; ctx.lineCap='round';
+  if(op.kind==='rect'){
+    const {x,y,w,h}=op; ctx.strokeRect(x,y,w,h);
+  } else if(op.kind==='arrow'){
+    const {x1,y1,x2,y2}=op;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    // pointe
+    const ang=Math.atan2(y2-y1,x2-x1); const len=10+op.w*1.5;
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2 - len*Math.cos(ang - Math.PI/7), y2 - len*Math.sin(ang - Math.PI/7));
+    ctx.lineTo(x2 - len*Math.cos(ang + Math.PI/7), y2 - len*Math.sin(ang + Math.PI/7));
+    ctx.closePath(); ctx.fill();
+  } else if(op.kind==='text'){
+    ctx.font=`${Math.max(14, 10+op.w*2)}px system-ui, -apple-system, Segoe UI, Roboto`;
+    ctx.fillText(op.text, op.x, op.y);
+  }
+  ctx.restore();
+  if(push) annoOps.push(op);
+}
+function imgCoords(e){
+  const rect=els.img.getBoundingClientRect();
+  const x=(e.clientX-rect.left)*(natural.w/rect.width);
+  const y=(e.clientY-rect.top )*(natural.h/rect.height);
+  return {x, y};
+}
+els.tools.forEach(b=>{
+  b.addEventListener('click',()=>{
+    els.tools.forEach(x=> x.classList.remove('active'));
+    b.classList.add('active'); activeTool=b.dataset.tool;
+    measuring=false; els.measure.dataset.on='0'; els.measure.style.outline='none';
+    ocrSelecting=false;
+  });
+});
+els.clearAnno.addEventListener('click', ()=>{ if(confirm('Effacer toutes les annotations ?')){ clearAnnoCanvas(true);} });
+els.undo.addEventListener('click', ()=>{ annoOps.pop(); repaintAnno(); });
+
+['mousedown','touchstart'].forEach(ev=>{
+  els.anno.addEventListener(ev, e=>{
+    if(!activeTool && !measuring && !ocrSelecting) return;
+    drawing=true;
+    const pt = (e.touches ? e.touches[0] : e);
+    const p=imgCoords(pt);
+    startPt=p;
+    if(activeTool==='text'){
+      const t=prompt('Texte à placer :'); if(t){ drawOp({kind:'text', text:t, x:p.x, y:p.y, color:els.acolor.value, w:parseInt(els.awidth.value,10)} , annoCtx); }
+      drawing=false;
+    } else if(measuring){
+      if(!measStart){ measStart=p; }
+      else{
+        const dx=p.x-measStart.x, dy=p.y-measStart.y;
+        const distPx=Math.hypot(dx,dy);
+        if(pxPerMm){ const mm=(distPx/pxPerMm).toFixed(2); els.scaleInfo.textContent=`Mesure: ${mm} mm`; }
+        else{ els.scaleInfo.textContent=`Mesure: ${distPx.toFixed(1)} px (calibre pour avoir des mm)`; }
+        // petite flèche temporaire
+        drawOp({kind:'arrow', x1:measStart.x,y1:measStart.y,x2:p.x,y2:p.y, color:'#7aa2ff', w:2}, annoCtx);
+        measStart=null;
+      }
+    } else if(ocrSelecting){
+      ocrStart=p; ocrRect=null;
+    }
+  }, {passive:false});
+});
+
+['mousemove','touchmove'].forEach(ev=>{
+  els.anno.addEventListener(ev, e=>{
+    if(!drawing || !startPt || measuring || activeTool==='text') return;
+    const pt = (e.touches ? e.touches[0] : e);
+    const p=imgCoords(pt);
+    repaintAnno(); // redessine tout puis l’aperçu
+    const col=els.acolor.value, w=parseInt(els.awidth.value,10);
+    if(activeTool==='rect'){
+      const op={kind:'rect', x:Math.min(startPt.x,p.x), y:Math.min(startPt.y,p.y), w:Math.abs(p.x-startPt.x), h:Math.abs(p.y-startPt.y), color:col, w:w};
+      drawOp(op, annoCtx, false); // aperçu
+    } else if(activeTool==='arrow'){
+      const op={kind:'arrow', x1:startPt.x, y1:startPt.y, x2:p.x, y2:p.y, color:col, w:w};
+      drawOp(op, annoCtx, false);
+    } else if(ocrSelecting){
+      // rien ici
+    }
+  }, {passive:false});
+});
+
+['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>{
+  els.anno.addEventListener(ev, e=>{
+    if(!drawing) return;
+    drawing=false;
+    if(activeTool && startPt && !measuring && !ocrSelecting){
+      const pt=(e.changedTouches? e.changedTouches[0]:e);
+      const p=imgCoords(pt);
+      const col=els.acolor.value, w=parseInt(els.awidth.value,10);
+      if(activeTool==='rect'){
+        const op={kind:'rect', x:Math.min(startPt.x,p.x), y:Math.min(startPt.y,p.y), w:Math.abs(p.x-startPt.x), h:Math.abs(p.y-startPt.y), color:col, w:w};
+        drawOp(op, annoCtx, true);
+      } else if(activeTool==='arrow'){
+        const op={kind:'arrow', x1:startPt.x, y1:startPt.y, x2:p.x, y2:p.y, color:col, w:w};
+        drawOp(op, annoCtx, true);
+      }
+    } else if(ocrSelecting && ocrStart){
+      const pt=(e.changedTouches? e.changedTouches[0]:e);
+      const p=imgCoords(pt);
+      ocrRect = {x:Math.min(ocrStart.x,p.x), y:Math.min(ocrStart.y,p.y), w:Math.abs(p.x-ocrStart.x), h:Math.abs(p.y-ocrStart.y)};
+      // dessine cadre
+      drawOp({kind:'rect', ...ocrRect, color:'#ffd166', w:2}, annoCtx);
+      runOCR(ocrRect);
+      ocrStart=null; ocrSelecting=false; els.ocrStatus.textContent='OCR en cours…';
+    }
+    startPt=null;
+  }, {passive:false});
+});
+
+/* ---------- CALIBRATION & MESURE & GRILLE ---------- */
+els.calib.addEventListener('click', ()=>{
+  if(!els.img.src){ alert('Charge une image d’abord.'); return; }
+  measuring=false; ocrSelecting=false; activeTool=null;
+  els.measure.dataset.on='0'; els.measure.style.outline='none';
+  alert('Calibration : clique deux points correspondant à une distance connue (ex: le diamètre de la monnaie).');
+  let first=null;
+  const handler = (e)=>{
+    const p=imgCoords(e);
+    if(!first){ first=p; }
+    else{
+      const distPx=Math.hypot(p.x-first.x, p.y-first.y);
+      const val=parseFloat(prompt('Distance réelle en mm :', '22.0'));
+      if(val && val>0){ pxPerMm = distPx/val; els.scaleInfo.textContent=`Échelle: 1 mm ≈ ${pxPerMm.toFixed(2)} px`; drawGrid(); }
+      els.anno.removeEventListener('click', handler);
+    }
+  };
+  els.anno.addEventListener('click', handler);
+});
+
+els.measure.addEventListener('click', ()=>{
+  if(!els.img.src){ alert('Charge une image d’abord.'); return; }
+  measuring = els.measure.dataset.on==='1' ? false : true;
+  els.measure.dataset.on = measuring?'1':'0';
+  els.measure.style.outline = measuring?'2px solid rgba(122,162,255,.6)':'none';
+  activeTool=null; ocrSelecting=false;
+  measStart=null;
+});
+
+els.gridToggle.addEventListener('click', ()=>{
+  if(!els.img.src){ alert('Charge une image d’abord.'); return; }
+  els.grid.style.display = (els.grid.style.display==='none'||!els.grid.style.display)?'block':'none';
+  drawGrid();
+});
+
+function drawGrid(){
+  const ctx=els.grid.getContext('2d');
+  ctx.clearRect(0,0,els.grid.width,els.grid.height);
+  if(els.grid.style.display==='none') return;
+  const stepMm = pxPerMm ? 5 : null; // grille tous les 5 mm si calibrée
+  ctx.globalAlpha=0.5; ctx.strokeStyle='rgba(122,162,255,.6)'; ctx.lineWidth=1;
+  if(pxPerMm && stepMm){
+    const stepPx = stepMm*pxPerMm;
+    // origin top-left (0,0)
+    for(let x=0; x<els.grid.width; x+=stepPx){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,els.grid.height); ctx.stroke(); }
+    for(let y=0; y<els.grid.height; y+=stepPx){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(els.grid.width,y); ctx.stroke(); }
+  } else {
+    // si pas de calibration : grille 100 px
+    const step=100;
+    for(let x=0; x<els.grid.width; x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,els.grid.height); ctx.stroke(); }
+    for(let y=0; y<els.grid.height; y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(els.grid.width,y); ctx.stroke(); }
+  }
+  ctx.globalAlpha=1;
+}
+
+/* ---------- OCR (Zone) ---------- */
+els.ocrZone.addEventListener('click', ()=>{
+  if(!els.img.src){ alert('Charge une image d’abord.'); return; }
+  activeTool=null; measuring=false; els.measure.dataset.on='0'; els.measure.style.outline='none';
+  ocrSelecting=true; els.ocrStatus.textContent='Sélectionne une zone à lire…';
+  alert('OCR : trace un rectangle autour de la légende/inscription à lire.');
+});
+async function runOCR(rect){
+  try{
+    els.ocrStatus.textContent='OCR en cours…';
+    // extraire la zone depuis l’image originale (avec filtres appliqués pour aider)
+    const w=rect.w, h=rect.h;
+    if(w<10 || h<10){ els.ocrStatus.textContent='Zone trop petite.'; return; }
+    const out=document.createElement('canvas'); out.width=w; out.height=h;
+    const ctx=out.getContext('2d');
+    ctx.filter=getComputedStyle(els.img).filter + ' contrast(1.4) grayscale(1)';
+    const tmp=document.createElement('canvas'); tmp.width=natural.w; tmp.height=natural.h;
+    const tctx=tmp.getContext('2d'); tctx.drawImage(els.img,0,0);
+    const crop=tctx.getImageData(rect.x, rect.y, rect.w, rect.h);
+    out.getContext('2d').putImageData(crop,0,0);
+    // Tesseract (lang "eng" par défaut; on pourra ajouter "fra" plus tard)
+    const { data:{ text } } = await Tesseract.recognize(out, 'eng', { logger: m=> (els.ocrStatus.textContent = 'OCR: '+ (m.status||'') ) });
+    const clean = text.replace(/\s+/g,' ').trim();
+    els.ocrOut.textContent = clean || '—';
+    els.ocrStatus.textContent='OCR terminé.';
+  }catch(err){
+    console.error(err); els.ocrStatus.textContent='Erreur OCR';
+  }
+}
+els.pushOCR.addEventListener('click', ()=>{
+  const t=(els.ocrOut.textContent||'').trim();
+  if(!t || t==='—') return;
+  const cur=(els.letters.value||'').trim();
+  els.letters.value = (cur ? (cur+' ') : '') + t.toUpperCase();
+});
+els.clearOCR.addEventListener('click', ()=>{ els.ocrOut.textContent='—'; els.ocrStatus.textContent='—'; });
+
+/* ---------- PISTES & EXPORTS FICHE ---------- */
+function val(id){ return els[id]?.value?.trim() || ''; }
+function isChecked(id){ return !!els[id]?.checked; }
+
+els.gen.addEventListener('click', ()=>{
+  const data=collectData();
+  const cards=generateHints(data);
+  renderPistes(cards);
+});
+els.reset.addEventListener('click', ()=>{
+  ['type','metal','diam','letters','context'].forEach(id => els[id].value='');
+  ['rond','trou','attache','charniere','ardillon','canal','boucle','portrait','croix','animal'].forEach(id=> els[id].checked=false);
+  els.pistes.innerHTML='';
+});
+
+function collectData(){
+  return {
+    type: val('type'), metal: val('metal'),
+    diam: parseFloat(val('diam')) || null,
+    letters: val('letters').toUpperCase(),
+    context: val('context'),
+    f:{rond:isChecked('rond'), trou:isChecked('trou'), attache:isChecked('attache'),
+       charniere:isChecked('charniere'), ardillon:isChecked('ardillon'), canal:isChecked('canal'),
+       boucle:isChecked('boucle'), portrait:isChecked('portrait'), croix:isChecked('croix'), animal:isChecked('animal')},
+    scale: pxPerMm? {pxPerMm}: null
+  };
+}
+function renderPistes(items){
+  els.pistes.innerHTML='';
+  if(!items.length){ els.pistes.innerHTML='<div class="card">Ajoute un diamètre, des lettres ou coche des éléments pour affiner.</div>'; return; }
+  items.forEach(it=>{
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML = `<div style="display:flex; gap:8px; align-items:center; margin-bottom:6px">
+      <strong>${it.title}</strong>${it.tag?` <span class="badge" style="background:${it.tagColor||'rgba(122,162,255,.9)'}">${it.tag}</span>`:''}
+    </div><div class="muted" style="white-space:pre-line">${it.text}</div>`;
+    els.pistes.appendChild(card);
+  });
+}
+
+els.exportMd.addEventListener('click', ()=>{
+  const d=collectData();
+  const hints=generateHints(d);
+  const now=new Date().toLocaleString();
+  const lines=[];
+  lines.push(`# Rapport d’identification — ID Detect`);
+  lines.push('');
+  lines.push(`**Date**: ${now}`,'');
+  lines.push(`## Indices fournis`);
+  lines.push(`- Type pressenti: ${d.type||'—'}`);
+  lines.push(`- Métal supposé: ${d.metal||'—'}`);
+  lines.push(`- Diamètre (mm): ${d.diam||'—'}`);
+  lines.push(`- Lettres/motifs: ${d.letters||'—'}`);
+  lines.push(`- Contexte: ${d.context||'—'}`);
+  lines.push(`- Cases: ${Object.entries(d.f).filter(([k,v])=>v).map(([k])=>k).join(', ')||'—'}`);
+  if(pxPerMm){ lines.push(`- Échelle: 1 mm ≈ ${pxPerMm.toFixed(2)} px`); }
+  lines.push('',`## Pistes générées`);
+  hints.forEach(h=>{ lines.push(`### ${h.title}`,'', h.text,''); });
+  const blob=new Blob([lines.join('\n')],{type:'text/markdown'});
+  downloadURL(URL.createObjectURL(blob),'ID-Detect-rapport.md');
+});
+
+els.exportJSON.addEventListener('click', ()=>{
+  const d=collectData();
+  const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+  downloadURL(URL.createObjectURL(blob),'ID-Detect-fiche.json');
+});
+els.exportCSV.addEventListener('click', ()=>{
+  const d=collectData();
+  const headers=['type','metal','diam(mm)','letters','context','rond','trou','attache','charniere','ardillon','canal','boucle','portrait','croix','animal','pxPerMm'];
+  const row=[
+    d.type,d.metal,(d.diam??''), `"${(d.letters||'').replace(/"/g,'""')}"`, `"${(d.context||'').replace(/"/g,'""')}"`,
+    d.f.rond,d.f.trou,d.f.attache,d.f.charniere,d.f.ardillon,d.f.canal,d.f.boucle,d.f.portrait,d.f.croix,d.f.animal,
+    pxPerMm?pxPerMm.toFixed(4):''
+  ];
+  const csv = headers.join(',')+'\n'+row.join(',');
+  const blob=new Blob([csv],{type:'text/csv'});
+  downloadURL(URL.createObjectURL(blob),'ID-Detect-fiche.csv');
+});
+
+/* ---------- Heuristiques (pistes) ---------- */
+/* (identiques à la version précédente, légèrement raccourcies pour tenir) */
+function generateHints(d){
+  const out=[]; const add=(t,txt,tag='Piste',c='rgba(122,162,255,.9)')=>out.push({title:t,text:txt,tag:tag,tagColor:c});
+  const diam=d.diam;
+  if(d.f.rond){
+    if(d.f.attache||d.f.trou){
+      add('Bouton (XIXe–XXe ?)',`Rond + ${d.f.attache?'pied/attache':''}${(d.f.attache&&d.f.trou)?' + ':''}${d.f.trou?'trou central':''} ➜ **bouton** possible.\n• Face B: pied ou 2 trous.\n• Indices: lignes concentriques, armoiries chiffrées.`,'Morphologie');
+    } else if(diam){
+      if(diam>=8 && diam<=35){
+        add('Monnaie probable',`Disque ${diam} mm, sans attache ➜ **monnaie**.\n• Relief 2 faces, légende en couronne, listel.\n• Essayez Contours + N&B pour lire.`,'Morphologie','#35d07f');
+      } else if(diam>35){
+        add('Médaille / Jeton',`>35 mm ➜ **médaille/jeton**. Cherche trace de bélière ou trou de suspension.`,'Morphologie');
+      }
+    } else add('Disque','Donne le diamètre pour affiner (15–28 mm → monnaie fréquente).','Morphologie');
+  }
+  if(d.f.canal){ add('Plomb de scellé',`**Canal/fente** ➜ plomb de scellé (XIXe–XXe). Cherche **initiales/villes**.`,'Indice','#ffd166'); }
+  if(d.f.charniere||d.f.ardillon){
+    add('Fibule ou boucle ?',`${d.f.charniere?'Charnière':''}${(d.f.charniere&&d.f.ardillon)?' + ':''}${d.f.ardillon?'ardillon':''} ➜ **fibule** si arc + porte-ardillon. Si cadre + axe + ardillon ➜ **boucle**.`,'Morphologie');
+  }
+  if(d.f.boucle){ add('Boucle',`Cadre + éventuel ardillon ➜ **boucle** (usure sur barre centrale).`); }
+  if(d.metal==='Plomb' && d.f.rond && !d.f.attache && (!diam||diam>=10)){
+    add('Balle ancienne',`Plomb arrondi ➜ **balle** (mousquet/chasse). Cherche plan de joint, marque de coulée, impact.`); }
+
+  if(d.letters){
+    const L=d.letters;
+    if(/PHILIP|PHILIPP|PHILIPVS/.test(L)) add('Habsbourg',`« PHILIP(PVS) » ➜ **Pays-Bas espagnols** XVIe–XVIIe. Indices: Flandria/Brabant, lion, main d’Anvers.`,'Texte');
+    if(/LEOPOLD|LEOPOLDVS/.test(L)) add('Leopold',`Peut viser **Autriche** (XVIe–XVIIIe) ou **Belgique XIXe** (« ROI DES BELGES »).`,'Texte');
+    if(/NAPOLEON|EMPIRE|FRAN[CS]AIS/.test(L)) add('Napoléon',`**Franc/centime** (début XIXe).`,'Texte');
+    if(/\b1[5-9]\d{2}\b|\b18\d{2}\b|\b19\d{2}\b/.test(L)){ const dte=L.match(/\b1[5-9]\d{2}\b|\b18\d{2}\b|\b19\d{2}\b/)[0]; add('Date lisible',`Date « ${dte} » ➜ datation directe (compare module/légende).`,'Indice');}
+    if(/LION|BRABANT|FLAND/.test(L) || d.f.animal) add('Lion héraldique',`Souvent lié **Brabant/Flandre** (bas-pays médiévaux/modernes).`,'Motif');
+    if(d.f.croix) add('Croix',`Motif fréquent médiéval/jetons. Lire la légende en couronne.`,'Motif');
+    if(d.f.portrait) add('Effigie',`Monnaies **modernes/pré-modernes** (profil, laurier, barbe…).`,'Motif');
+  }
+
+  if(d.diam && (!d.type||d.type==='Monnaie')){
+    if(d.diam>=16&&d.diam<=20) add('Module petit',`16–20 mm → deniers/oboles/centimes selon période.`,'Module');
+    if(d.diam>=21&&d.diam<=24) add('Module moyen',`21–24 mm → 1/2/5 centimes XIXe–XXe, jetons.`,'Module');
+    if(d.diam>=25&&d.diam<=28) add('Module grand',`25–28 mm → 1–2 francs XIXe–XXe, médailles/jetons.`,'Module');
+  }
+
+  if(d.context){
+    const cx=d.context.toLowerCase();
+    if(/plage|dune|sable/.test(cx)) add('Contexte plage',`Sel → argent noirci, cuivre chloruré. Rincer à l’eau déminéralisée puis sécher.`,'Contexte');
+    if(/for[eê]t|bois/.test(cx)) add('Contexte forêt',`Sols acides, médiéval possible près d’anciens chemins.`,'Contexte');
+    if(/champ|agri|labour/.test(cx)) add('Contexte champ',`Labours → coups/pliures. Balayer en rayon pour indices.`,'Contexte');
+    if(/milit|tranch[eé]e|camp/.test(cx)) add('Contexte militaire',`Balles/douilles/insignes. **Sécurité** : tout explosif présumé → ne pas manipuler.`,'Sécurité','#ff6b6b');
+  }
+
+  add('Améliorer la lisibilité',`• 2 faces à plat, lumière rasante 45°\n• Contours + N&B pour la légende\n• Deux angles de lumière opposés\n• Prélever la couleur pour orienter le métal`,'Astuce','#35d07f');
+  return out;
+}
+
+/* ---------- OCR aide texte ---------- */
+function getText(el){ return (el.textContent||'').trim(); }
+
+/* ---------- UTIL ---------- */
+function toggleActive(el){ el.dataset.on = el.dataset.on==='1'?'0':'1'; }
+
+/* ---------- FIN SCRIPTS ---------- */
+</script>
+</body>
+</html>
